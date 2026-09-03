@@ -1,50 +1,92 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="edith">
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      <aside className="sidebar">
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+        <h1 className="logo">
+          E.D.I.T.H.
+        </h1>
+
+        <button>🧠 Dashboard</button>
+        <button>💬 Assistant</button>
+        <button>📋 Tasks</button>
+        <button>💻 Coding</button>
+        <button>📁 Files</button>
+        <button>⚙ Settings</button>
+
+        <div className="online">
+          ● AI Core Online
+        </div>
+
+      </aside>
+
+
+      <main className="main">
+
+        <h2>
+          Welcome back, Yassir
+        </h2>
+
+        <p className="subtitle">
+          E.D.I.T.H. is ready.
+        </p>
+
+
+        <div className="cards">
+
+          <div className="card">
+            <h3>AI Intelligence</h3>
+            <p>
+              Waiting for API connection
+            </p>
+          </div>
+
+
+          <div className="card">
+            <h3>System Control</h3>
+            <p>
+              Desktop assistant modules offline
+            </p>
+          </div>
+
+
+          <div className="card">
+            <h3>Memory</h3>
+            <p>
+              Local memory database ready
+            </p>
+          </div>
+
+        </div>
+
+
+        <div className="chatbox">
+
+          <p>
+            Hello Yassir. I am E.D.I.T.H.
+          </p>
+
+          <div className="input-area">
+
+            <input 
+              placeholder="Talk to E.D.I.T.H..."
+            />
+
+            <button>
+              Send
+            </button>
+
+          </div>
+
+        </div>
+
+
+      </main>
+
+    </div>
   );
 }
 
