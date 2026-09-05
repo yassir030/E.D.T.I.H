@@ -6,6 +6,10 @@ import type {
   FilesystemStatus,
   PublicAiSettings,
   SystemStatus,
+  Conversation,
+  MemoryEntry,
+  ToolResult,
+  ActionLogEntry,
 } from "../types";
 
 type RustPublicSettings = {
@@ -22,6 +26,7 @@ type RustSystemStatus = {
   filesystem_ready: boolean;
   memory_backend: string;
   voice_ready: boolean;
+  desktop_control_ready: boolean;
 };
 
 type RustDesktopTool = {
@@ -82,6 +87,65 @@ export async function clearApiKey(): Promise<PublicAiSettings> {
   return mapSettings(raw);
 }
 
+export async function testAiConnection(): Promise<void> {
+  await invoke<void>("test_ai_connection");
+}
+
+export async function loadPersistentSettings(): Promise<void> {
+  await invoke<void>("load_persistent_settings");
+}
+
+// Tool operations
+export async function listDesktopTools(): Promise<DesktopTool[]> {
+  const raw = await invoke<DesktopTool[]>("list_desktop_tools");
+  return raw;
+}
+
+export async function invokeDesktopTool(toolId: string, args: Record<string, unknown>): Promise<ToolResult> {
+  return invoke<ToolResult>("invoke_desktop_tool", {
+    payload: { tool_id: toolId, arguments: args },
+  });
+}
+
+// Conversation operations
+export async function saveConversation(conversation: Conversation): Promise<void> {
+  await invoke<void>("save_conversation", { payload: { conversation } });
+}
+
+export async function getConversations(): Promise<Conversation[]> {
+  return invoke<Conversation[]>("get_conversations");
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  await invoke<void>("delete_conversation", { id });
+}
+
+// Memory operations
+export async function saveMemory(memory: MemoryEntry): Promise<void> {
+  await invoke<void>("save_memory", { payload: { memory } });
+}
+
+export async function getMemory(): Promise<MemoryEntry[]> {
+  return invoke<MemoryEntry[]>("get_memory");
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  await invoke<void>("delete_memory", { id });
+}
+
+export async function clearAllMemory(): Promise<void> {
+  await invoke<void>("clear_all_memory");
+}
+
+// Action log operations
+export async function getActionLog(limit?: number): Promise<ActionLogEntry[]> {
+  return invoke<ActionLogEntry[]>("get_action_log", { limit });
+}
+
+export async function clearActionLog(): Promise<void> {
+  await invoke<void>("clear_action_log");
+}
+
 export async function fetchSystemStatus(): Promise<SystemStatus> {
   const raw = await invoke<RustSystemStatus>("get_system_status");
   return {
@@ -91,6 +155,7 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
     filesystemReady: raw.filesystem_ready,
     memoryBackend: raw.memory_backend,
     voiceReady: raw.voice_ready,
+    desktopControlReady: raw.desktop_control_ready,
   };
 }
 
@@ -111,12 +176,9 @@ export async function fetchFilesystemStatus(): Promise<FilesystemStatus> {
   return invoke<RustFilesystemStatus>("get_filesystem_status");
 }
 
-export async function invokeDesktopTool(toolId: string): Promise<string> {
-  return invoke<string>("invoke_desktop_tool", { toolId });
-}
-
 export type AIProvider = {
   sendMessage: (messages: ChatMessage[]) => Promise<string>;
+  testConnection: () => Promise<void>;
   streamMessage: (
     messages: ChatMessage[],
     onChunk: (chunk: string) => void,
@@ -138,6 +200,9 @@ async function sendAiMessage(messages: ChatMessage[]): Promise<string> {
 export const tauriAiClient: AIProvider = {
   async sendMessage(messages) {
     return sendAiMessage(messages);
+  },
+  async testConnection() {
+    await testAiConnection();
   },
   async streamMessage(messages, onChunk) {
     const content = await sendAiMessage(messages);

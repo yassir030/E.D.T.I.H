@@ -1,5 +1,7 @@
 use crate::ai::{self, ChatCompletionResult, ChatMessageInput};
 use crate::state::{AppState, ProviderKind};
+use crate::tools::{ToolRequest, ToolResult};
+use crate::storage::{Conversation, MemoryEntry};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -27,6 +29,16 @@ pub struct SendAiMessagePayload {
     pub messages: Vec<ChatMessageInput>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SaveConversationPayload {
+    pub conversation: Conversation,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SaveMemoryPayload {
+    pub memory: MemoryEntry,
+}
+
 #[derive(Debug, Serialize)]
 pub struct SystemStatus {
     pub app_name: String,
@@ -35,6 +47,7 @@ pub struct SystemStatus {
     pub filesystem_ready: bool,
     pub memory_backend: String,
     pub voice_ready: bool,
+    pub desktop_control_ready: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -103,7 +116,13 @@ pub fn save_provider_settings(
             .model
             .lock()
             .map_err(|_| "Interne state is vergrendeld.".to_string())?;
-        *model_guard = model;
+        *model_guard = model.clone();
+    }
+
+    // Save to persistent storage
+    if let Ok(storage) = state.storage.lock() {
+        let _ = storage.save_setting("provider", provider.as_str());
+        let _ = storage.save_setting("model", &model);
     }
 
     get_public_ai_settings(state)
@@ -133,56 +152,153 @@ pub async fn send_ai_message(
 }
 
 #[tauri::command]
+pub async fn test_ai_connection(state: State<'_, AppState>) -> Result<(), String> {
+    ai::test_connection(&state).await
+}
+
+#[tauri::command]
 pub fn get_system_status() -> SystemStatus {
     SystemStatus {
         app_name: "E.D.I.T.H.".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         platform: std::env::consts::OS.to_string(),
-        filesystem_ready: false,
-        memory_backend: "runtime-memory".to_string(),
+        filesystem_ready: true,
+        memory_backend: "sqlite".to_string(),
         voice_ready: false,
+        desktop_control_ready: cfg!(not(target_os = "linux")),
     }
 }
 
 #[tauri::command]
-pub fn list_desktop_tools() -> Vec<DesktopTool> {
-    vec![
-        tool("open_file", "Open file", "path", true),
-        tool("open_folder", "Open folder", "path", true),
-        tool("open_application", "Open application", "app_id", true),
-        tool("open_browser", "Open browser", "url", true),
-        tool("system_information", "System information", "none", false),
-        tool("screenshot", "Screenshot", "none", true),
-        tool("keyboard_automation", "Keyboard automation", "sequence", true),
-        tool("mouse_automation", "Mouse automation", "action", true),
-    ]
+pub fn list_desktop_tools(state: State<'_, AppState>) -> Vec<DesktopTool> {
+    let registry = state.tool_registry.lock().unwrap();
+    let tools = registry.list_tools();
+
+    tools.into_iter().map(|tool| {
+        let tool_id = tool.id.clone();
+        DesktopTool {
+            id: tool_id.clone(),
+            name: tool.name,
+            description: tool.description,
+            input: "JSON arguments".to_string(),
+            output: "Tool result".to_string(),
+            requires_confirmation: registry.requires_confirmation(&tool_id),
+            enabled: tool.enabled,
+        }
+    }).collect()
 }
 
 #[tauri::command]
 pub fn get_filesystem_status() -> FilesystemStatus {
     FilesystemStatus {
-        available: false,
-        message: "Filesystem-integratie is nog niet aangesloten. Er worden geen lokale bestanden getoond of verzonnen.".to_string(),
+        available: true,
+        message: "Filesystem integration is active. Access is limited to user-approved directories.".to_string(),
     }
 }
 
 #[tauri::command]
-pub fn invoke_desktop_tool(tool_id: String) -> Result<String, String> {
-    let known = list_desktop_tools();
-    if !known.iter().any(|tool| tool.id == tool_id) {
-        return Err("Onbekende tool.".to_string());
+pub fn invoke_desktop_tool(state: State<'_, AppState>, payload: ToolRequest) -> Result<ToolResult, String> {
+    let registry = state.tool_registry.lock().unwrap();
+
+    // Check if tool exists
+    if registry.get_tool(&payload.tool_id).is_none() {
+        return Err(format!("Onbekende tool: {}", payload.tool_id));
     }
-    Err("Deze desktop-tool is geregistreerd maar nog niet ingeschakeld. Er wordt niets uitgevoerd.".to_string())
+
+    // Execute the tool
+    match registry.execute_tool(&payload.tool_id, &payload.arguments) {
+        Ok(result) => {
+            // Log the action
+            if let Ok(storage) = state.storage.lock() {
+                let _ = storage.log_action(
+                    &format!("Tool execution: {}", payload.tool_id),
+                    &payload.tool_id,
+                    if result.success { "Success" } else { "Failed" }
+                );
+            }
+            Ok(result)
+        }
+        Err(e) => Ok(ToolResult {
+            success: false,
+            message: format!("Tool execution failed: {}", e),
+            data: None,
+        }),
+    }
 }
 
-fn tool(id: &str, name: &str, input: &str, requires_confirmation: bool) -> DesktopTool {
-    DesktopTool {
-        id: id.to_string(),
-        name: name.to_string(),
-        description: format!("{name} via de permission/tool-laag."),
-        input: input.to_string(),
-        output: "success | error".to_string(),
-        requires_confirmation,
-        enabled: false,
-    }
+#[tauri::command]
+pub fn save_conversation(state: State<'_, AppState>, payload: SaveConversationPayload) -> Result<(), String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .save_conversation(&payload.conversation)
+        .map_err(|e| format!("Failed to save conversation: {}", e))
+}
+
+#[tauri::command]
+pub fn get_conversations(state: State<'_, AppState>) -> Result<Vec<Conversation>, String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .list_conversations()
+        .map_err(|e| format!("Failed to get conversations: {}", e))
+}
+
+#[tauri::command]
+pub fn delete_conversation(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .delete_conversation(&id)
+        .map_err(|e| format!("Failed to delete conversation: {}", e))
+}
+
+#[tauri::command]
+pub fn save_memory(state: State<'_, AppState>, payload: SaveMemoryPayload) -> Result<(), String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .save_memory(&payload.memory)
+        .map_err(|e| format!("Failed to save memory: {}", e))
+}
+
+#[tauri::command]
+pub fn get_memory(state: State<'_, AppState>) -> Result<Vec<MemoryEntry>, String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .list_memory()
+        .map_err(|e| format!("Failed to get memory: {}", e))
+}
+
+#[tauri::command]
+pub fn delete_memory(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .delete_memory(&id)
+        .map_err(|e| format!("Failed to delete memory: {}", e))
+}
+
+#[tauri::command]
+pub fn clear_all_memory(state: State<'_, AppState>) -> Result<(), String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .clear_all_memory()
+        .map_err(|e| format!("Failed to clear memory: {}", e))
+}
+
+#[tauri::command]
+pub fn get_action_log(state: State<'_, AppState>, limit: Option<i32>) -> Result<Vec<(i64, String, String, String)>, String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .get_action_log(limit.unwrap_or(50))
+        .map_err(|e| format!("Failed to get action log: {}", e))
+}
+
+#[tauri::command]
+pub fn clear_action_log(state: State<'_, AppState>) -> Result<(), String> {
+    state.storage.lock()
+        .map_err(|_| "Storage is vergrendeld.".to_string())?
+        .clear_action_log()
+        .map_err(|e| format!("Failed to clear action log: {}", e))
+}
+
+#[tauri::command]
+pub fn load_persistent_settings(state: State<'_, AppState>) -> Result<(), String> {
+    state.load_persistent_settings()
 }

@@ -110,10 +110,20 @@ select {
     transform 0.2s ease;
 }
 
-.nav-btn:hover {
+.nav-btn:hover,
+.nav-btn:focus-visible {
   background: rgba(255, 255, 255, 0.06);
   color: white;
   transform: translateX(3px);
+}
+
+.nav-btn:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(130, 155, 255, 0.7);
+  outline-offset: 2px;
 }
 
 .nav-btn.active {

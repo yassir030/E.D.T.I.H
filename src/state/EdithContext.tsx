@@ -10,7 +10,7 @@ import {
   type SetStateAction,
 } from "react";
 import { memoryService } from "../services/memory";
-import { fetchPublicAiSettings, fetchSystemStatus } from "../services/tauri";
+import { fetchPublicAiSettings, fetchSystemStatus, loadPersistentSettings } from "../services/tauri";
 import type {
   ActivityItem,
   AppView,
@@ -37,6 +37,7 @@ type EdithContextValue = {
   systemStatus: SystemStatus | null;
   refreshSettings: () => Promise<void>;
   memoryCount: number;
+  setMemoryCount: Dispatch<SetStateAction<number>>;
   refreshMemoryCount: () => void;
 };
 
@@ -95,6 +96,8 @@ export function EdithProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Load persistent settings on startup
+    void loadPersistentSettings();
     void refreshSettings();
     refreshMemoryCount();
   }, [refreshMemoryCount, refreshSettings]);
@@ -115,6 +118,7 @@ export function EdithProvider({ children }: { children: ReactNode }) {
       systemStatus,
       refreshSettings,
       memoryCount,
+      setMemoryCount,
       refreshMemoryCount,
     }),
     [
@@ -125,6 +129,7 @@ export function EdithProvider({ children }: { children: ReactNode }) {
       messages,
       refreshMemoryCount,
       refreshSettings,
+      setMemoryCount,
       setView,
       settings,
       systemStatus,

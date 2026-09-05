@@ -1,4 +1,6 @@
 use std::sync::Mutex;
+use crate::tools::ToolRegistry;
+use crate::storage::Storage;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderKind {
@@ -28,7 +30,7 @@ impl ProviderKind {
     pub fn default_model(self) -> &'static str {
         match self {
             Self::Openai => "gpt-4o-mini",
-            Self::Gemini => "gemini-2.0-flash",
+            Self::Gemini => "gemini-3.1-flash-lite",
             Self::Claude => "claude-sonnet-4-20250514",
         }
     }
@@ -38,6 +40,8 @@ pub struct AppState {
     pub provider: Mutex<ProviderKind>,
     pub model: Mutex<String>,
     api_key: Mutex<Option<String>>,
+    pub tool_registry: Mutex<ToolRegistry>,
+    pub storage: Mutex<Storage>,
 }
 
 impl AppState {
@@ -47,6 +51,8 @@ impl AppState {
             provider: Mutex::new(provider),
             model: Mutex::new(provider.default_model().to_string()),
             api_key: Mutex::new(None),
+            tool_registry: Mutex::new(ToolRegistry::new()),
+            storage: Mutex::new(Storage::new().expect("Failed to initialize storage")),
         }
     }
 
@@ -59,6 +65,12 @@ impl AppState {
             .api_key
             .lock()
             .map_err(|_| "Interne state is vergrendeld.".to_string())?;
+
+        // Save to persistent storage
+        if let Ok(storage) = self.storage.lock() {
+            let _ = storage.save_setting("api_key", &trimmed);
+        }
+
         *guard = Some(trimmed);
         Ok(())
     }
@@ -68,6 +80,12 @@ impl AppState {
             .api_key
             .lock()
             .map_err(|_| "Interne state is vergrendeld.".to_string())?;
+
+        // Clear from persistent storage
+        if let Ok(storage) = self.storage.lock() {
+            let _ = storage.delete_setting("api_key");
+        }
+
         *guard = None;
         Ok(())
     }
@@ -87,6 +105,41 @@ impl AppState {
     pub fn has_api_key(&self) -> Result<bool, String> {
         Ok(self.api_key_snapshot()?.is_some())
     }
+
+    pub fn load_persistent_settings(&self) -> Result<(), String> {
+        if let Ok(storage) = self.storage.lock() {
+            // Load API key from storage
+            if let Ok(Some(saved_key)) = storage.get_setting("api_key") {
+                if !saved_key.is_empty() {
+                    let mut guard = self
+                        .api_key
+                        .lock()
+                        .map_err(|_| "Interne state is vergrendeld.".to_string())?;
+                    *guard = Some(saved_key);
+                }
+            }
+
+            // Load provider and model
+            if let Ok(Some(saved_provider)) = storage.get_setting("provider") {
+                if let Ok(provider) = ProviderKind::parse(&saved_provider) {
+                    let mut provider_guard = self
+                        .provider
+                        .lock()
+                        .map_err(|_| "Interne state is vergrendeld.".to_string())?;
+                    *provider_guard = provider;
+                }
+            }
+
+            if let Ok(Some(saved_model)) = storage.get_setting("model") {
+                let mut model_guard = self
+                    .model
+                    .lock()
+                    .map_err(|_| "Interne state is vergrendeld.".to_string())?;
+                *model_guard = saved_model;
+            }
+        }
+        Ok(())
+    }
 }
 
 pub fn mask_secret(value: &str) -> String {
@@ -98,9 +151,8 @@ pub fn mask_secret(value: &str) -> String {
     if len <= 8 {
         return "•".repeat(len);
     }
-    let prefix: String = chars.iter().take(7).collect();
     let suffix: String = chars.iter().skip(len.saturating_sub(4)).collect();
-    format!("{prefix}••••••••••••{suffix}")
+    format!("••••••••{suffix}")
 }
 
 pub fn redact_secrets(message: &str, secret: Option<&str>) -> String {

@@ -19,6 +19,8 @@ dist-ssr
 secrets/
 credentials.json
 **/credentials*.json
+.edith/
+*.secret
 
 # Editor directories and files
 .vscode/*

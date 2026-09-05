@@ -48,7 +48,7 @@ pub async fn send(
         .json(&payload)
         .send()
         .await
-        .map_err(|_| "AI provider kon niet worden bereikt.".to_string())?;
+        .map_err(|err| map_network_error(&err))?;
 
     let status = response.status().as_u16();
     let body = response
@@ -72,4 +72,39 @@ pub async fn send(
     Ok(ChatCompletionResult {
         content: content.to_string(),
     })
+}
+
+pub async fn test_connection(api_key: &str) -> Result<(), String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|_| "AI provider kon niet worden bereikt.".to_string())?;
+
+    let response = client
+        .get("https://api.anthropic.com/v1/models")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .send()
+        .await
+        .map_err(|err| map_network_error(&err))?;
+
+    let status = response.status().as_u16();
+    let body = response
+        .text()
+        .await
+        .map_err(|_| "Ongeldig antwoord van de provider.".to_string())?;
+
+    if status >= 400 {
+        return Err(public_error_from_status(status, &body));
+    }
+
+    Ok(())
+}
+
+fn map_network_error(err: &reqwest::Error) -> String {
+    if err.is_timeout() {
+        "De verbinding met de provider is verlopen.".to_string()
+    } else {
+        "AI provider kon niet worden bereikt.".to_string()
+    }
 }

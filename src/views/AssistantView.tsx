@@ -6,7 +6,6 @@ import {
   type KeyboardEvent,
 } from "react";
 import { sendAssistantMessage } from "../services/ai";
-import { memoryService } from "../services/memory";
 import { useEdith } from "../state/EdithContext";
 import type { ChatMessage, ChatStatus } from "../types";
 import { createId, toUserError } from "../utils";
@@ -18,7 +17,6 @@ export function AssistantView() {
     settings,
     setView,
     logActivity,
-    refreshMemoryCount,
   } = useEdith();
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<ChatStatus>("idle");
@@ -72,8 +70,6 @@ export function AssistantView() {
         timestamp: Date.now(),
       };
       setMessages((current) => [...current, assistantMessage]);
-      memoryService.saveMemory("last_assistant_reply", reply.slice(0, 500));
-      refreshMemoryCount();
       setStatus("success");
     } catch (caught) {
       setStatus("error");
@@ -95,11 +91,29 @@ export function AssistantView() {
     }
   }
 
+  function clearConversation() {
+    setMessages([]);
+    setError(null);
+    setStatus("idle");
+    setDraft("");
+    logActivity("Assistant-gesprek gewist");
+  }
+
   return (
     <section className="view chat-view">
       <header className="page-header">
         <h2>Assistant</h2>
         <p className="subtitle">Praat met E.D.I.T.H. via je geconfigureerde provider.</p>
+        <div className="button-row">
+          <button
+            type="button"
+            className="ghost"
+            onClick={clearConversation}
+            disabled={busy || (messages.length === 0 && !draft && !error)}
+          >
+            Clear conversation
+          </button>
+        </div>
       </header>
 
       {!providerReady ? (

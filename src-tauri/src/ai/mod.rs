@@ -43,32 +43,85 @@ pub async fn send_message(
         ProviderKind::Claude => claude::send(&api_key, &model, &messages).await,
     };
 
-    result.map_err(|err| {
-        let safe = redact_secrets(&err, Some(&api_key));
-        if safe.to_ascii_lowercase().contains("connect")
-            || safe.to_ascii_lowercase().contains("dns")
-            || safe.to_ascii_lowercase().contains("timed out")
-        {
-            "AI provider kon niet worden bereikt.".to_string()
-        } else {
-            safe
-        }
-    })
+    result.map_err(|err| redact_secrets(&err, Some(&api_key)))
+}
+
+pub async fn test_connection(state: &AppState) -> Result<(), String> {
+    let provider = *state
+        .provider
+        .lock()
+        .map_err(|_| "Interne state is vergrendeld.".to_string())?;
+    let api_key = state
+        .api_key_snapshot()?
+        .ok_or_else(|| "Configureer eerst een AI provider in Settings.".to_string())?;
+
+    let result = match provider {
+        ProviderKind::Openai => openai::test_connection(&api_key).await,
+        ProviderKind::Gemini => gemini::test_connection(&api_key).await,
+        ProviderKind::Claude => claude::test_connection(&api_key).await,
+    };
+
+    result.map_err(|err| redact_secrets(&err, Some(&api_key)))
 }
 
 pub fn public_error_from_status(status: u16, body: &str) -> String {
     match status {
-        401 | 403 => "API key is ongeldig of heeft geen toegang.".to_string(),
-        429 => "Te veel verzoeken. Probeer later opnieuw.".to_string(),
-        400 | 404 | 422 => {
+        400 => {
             if let Some(msg) = extract_provider_error(body) {
                 if msg.len() < 180 {
-                    return format!("Het verzoek werd afgewezen: {msg}");
+                    return format!("Ongeldig verzoek: {msg}");
                 }
             }
-            "Het verzoek werd afgewezen door de provider.".to_string()
+            "Ongeldig verzoek: controleer model en parameters.".to_string()
         }
-        _ => "AI provider kon niet worden bereikt.".to_string(),
+        401 => {
+            if let Some(msg) = extract_provider_error(body) {
+                if msg.len() < 180 {
+                    return format!("Authenticatiefout: {msg}");
+                }
+            }
+            "API key is ongeldig of ontbreekt.".to_string()
+        }
+        403 => {
+            if let Some(msg) = extract_provider_error(body) {
+                if msg.len() < 180 {
+                    return format!("Toegang geweigerd: {msg}");
+                }
+            }
+            "API key heeft geen toegang tot deze resource of model.".to_string()
+        }
+        404 => {
+            if let Some(msg) = extract_provider_error(body) {
+                if msg.len() < 180 {
+                    return format!("Niet gevonden: {msg}");
+                }
+            }
+            "Model of resource niet gevonden. Controleer de modelnaam.".to_string()
+        }
+        429 => {
+            if let Some(msg) = extract_provider_error(body) {
+                if msg.len() < 180 {
+                    return format!("Rate limit: {msg}");
+                }
+            }
+            "Te veel verzoeken. Probeer later opnieuw.".to_string()
+        }
+        500..=599 => {
+            if let Some(msg) = extract_provider_error(body) {
+                if msg.len() < 180 {
+                    return format!("Providerfout ({status}): {msg}");
+                }
+            }
+            format!("Providerfout ({status}): de AI provider ondervindt problemen.")
+        }
+        _ => {
+            if let Some(msg) = extract_provider_error(body) {
+                if msg.len() < 180 {
+                    return format!("Fout ({status}): {msg}");
+                }
+            }
+            format!("Onverwachte fout ({status}).")
+        }
     }
 }
 

@@ -12,3 +12,7 @@ export async function sendAssistantMessage(
 ): Promise<string> {
   return getAiClient().sendMessage(messages);
 }
+
+export async function testAssistantConnection(): Promise<void> {
+  return getAiClient().testConnection();
+}

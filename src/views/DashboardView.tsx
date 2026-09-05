@@ -29,8 +29,8 @@ export function DashboardView() {
           <h3>AI Core</h3>
           <p>
             {settings?.hasApiKey
-              ? "Provider geconfigureerd. Chat is beschikbaar."
-              : "Nog geen API key. Configureer een provider in Settings."}
+              ? "● Provider geconfigureerd. Chat is beschikbaar."
+              : "○ Nog geen API key. Configureer een provider in Settings."}
           </p>
         </article>
         <article className="card">
@@ -44,13 +44,31 @@ export function DashboardView() {
         <article className="card">
           <h3>Memory</h3>
           <p>
-            Runtime memory actief · {memoryCount}{" "}
+            {systemStatus?.memoryBackend === "sqlite"
+              ? "● Local storage active"
+              : "○ Runtime memory only"} · {memoryCount}{" "}
             {memoryCount === 1 ? "item" : "items"}
           </p>
         </article>
         <article className="card">
           <h3>Current provider</h3>
           <p>{providerLabel}</p>
+        </article>
+        <article className="card">
+          <h3>Filesystem</h3>
+          <p>
+            {systemStatus?.filesystemReady
+              ? "● Available"
+              : "○ Not available"}
+          </p>
+        </article>
+        <article className="card">
+          <h3>Desktop Control</h3>
+          <p>
+            {systemStatus?.desktopControlReady
+              ? "● Available"
+              : "○ Not available (platform limitation)"}
+          </p>
         </article>
       </div>
 

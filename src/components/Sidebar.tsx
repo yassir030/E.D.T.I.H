@@ -42,7 +42,7 @@ export function Sidebar({ activeView, onNavigate, aiReady }: SidebarProps) {
         role="status"
         aria-live="polite"
       >
-        {aiReady ? "AI Core gereed" : "AI Core offline"}
+        {aiReady ? "● AI Core Online" : "● AI Core Offline"}
       </div>
     </aside>
   );

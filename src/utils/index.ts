@@ -13,11 +13,18 @@ export function formatTime(timestamp: number): string {
 }
 
 export function toUserError(error: unknown): string {
+  let message = "Er ging iets mis. Probeer het opnieuw.";
   if (typeof error === "string" && error.trim()) {
-    return error;
+    message = error;
+  } else if (error instanceof Error && error.message.trim()) {
+    message = error.message;
   }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Er ging iets mis. Probeer het opnieuw.";
+  return redactSecrets(message);
+}
+
+function redactSecrets(message: string): string {
+  return message
+    .replace(/sk-[A-Za-z0-9_-]+/g, "[redacted]")
+    .replace(/AIza[A-Za-z0-9_-]+/g, "[redacted]")
+    .replace(/sk-ant-[A-Za-z0-9_-]+/g, "[redacted]");
 }

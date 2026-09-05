@@ -48,6 +48,7 @@ export type SystemStatus = {
   filesystemReady: boolean;
   memoryBackend: string;
   voiceReady: boolean;
+  desktopControlReady: boolean;
 };
 
 export type DesktopTool = {
@@ -78,3 +79,27 @@ export type CodingWorkspace = {
   code: string;
   output: string;
 };
+
+export type Conversation = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MemoryEntry = {
+  id: string;
+  category: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type ToolResult = {
+  success: boolean;
+  message: string;
+  data: unknown;
+};
+
+export type ActionLogEntry = [number, string, string, string]; // [timestamp, action, tool, result]
