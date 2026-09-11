@@ -37,9 +37,15 @@ pub async fn send_message(
         .api_key_snapshot()?
         .ok_or_else(|| "Configureer eerst een AI provider in Settings.".to_string())?;
 
+    let registry = (*state
+        .tool_registry
+        .lock()
+        .map_err(|_| "Interne state is vergrendeld.".to_string())?)
+        .clone();
+
     let result = match provider {
         ProviderKind::Openai => openai::send(&api_key, &model, &messages).await,
-        ProviderKind::Gemini => gemini::send(&api_key, &model, &messages).await,
+        ProviderKind::Gemini => gemini::send(&api_key, &model, &messages, &registry).await,
         ProviderKind::Claude => claude::send(&api_key, &model, &messages).await,
     };
 

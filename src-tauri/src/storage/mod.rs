@@ -3,6 +3,7 @@ use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppSettings {
     pub provider: String,
@@ -151,6 +152,7 @@ impl Storage {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_conversation(&self, id: &str) -> Result<Option<Conversation>> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(
@@ -220,6 +222,7 @@ impl Storage {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_memory(&self, id: &str) -> Result<Option<MemoryEntry>> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(

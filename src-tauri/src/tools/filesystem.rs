@@ -1,4 +1,4 @@
-use super::{PermissionLevel, ToolDefinition, ToolRegistry, ToolResult};
+use super::{PermissionLevel, ToolDefinition, ToolRegistry, ToolResult, ToolCategory};
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::fs;
@@ -10,6 +10,7 @@ pub fn register_filesystem_tools(registry: &mut ToolRegistry) {
         name: "List Directory".to_string(),
         description: "List contents of a directory".to_string(),
         permission_level: PermissionLevel::ReadOnly,
+        category: ToolCategory::Filesystem,
         enabled: true,
         platform_supported: true,
     });
@@ -19,6 +20,7 @@ pub fn register_filesystem_tools(registry: &mut ToolRegistry) {
         name: "Read File".to_string(),
         description: "Read contents of a text file".to_string(),
         permission_level: PermissionLevel::ReadOnly,
+        category: ToolCategory::Filesystem,
         enabled: true,
         platform_supported: true,
     });
@@ -28,6 +30,7 @@ pub fn register_filesystem_tools(registry: &mut ToolRegistry) {
         name: "Create File".to_string(),
         description: "Create a new file with content".to_string(),
         permission_level: PermissionLevel::Destructive,
+        category: ToolCategory::Filesystem,
         enabled: true,
         platform_supported: true,
     });
@@ -37,6 +40,7 @@ pub fn register_filesystem_tools(registry: &mut ToolRegistry) {
         name: "Delete File".to_string(),
         description: "Delete a file".to_string(),
         permission_level: PermissionLevel::Destructive,
+        category: ToolCategory::Filesystem,
         enabled: true,
         platform_supported: true,
     });
@@ -46,6 +50,7 @@ pub fn register_filesystem_tools(registry: &mut ToolRegistry) {
         name: "Move File".to_string(),
         description: "Move or rename a file".to_string(),
         permission_level: PermissionLevel::Destructive,
+        category: ToolCategory::Filesystem,
         enabled: true,
         platform_supported: true,
     });
